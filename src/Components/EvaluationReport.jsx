@@ -2,12 +2,22 @@
 import React from 'react'
 import './EvaluationReport.css'
 
-const EvaluationReport = ({ requirements, laptopDetails, onStartNew }) => {
-  const selectedPurposes = requirements.selectedPurposes || []
-  const programmingTypes = requirements.programmingTypes || []
+const EvaluationReport = ({ requirements = {}, laptopDetails = {}, onStartNew }) => {
+  requirements = requirements || {}
+  laptopDetails = laptopDetails || {}
 
-  const formatPrice = (price) =>
-    Number(price || 0).toLocaleString('en-IN')
+  const selectedPurposes = Array.isArray(requirements.selectedPurposes)
+    ? requirements.selectedPurposes
+    : []
+
+  const programmingTypes = Array.isArray(requirements.programmingTypes)
+    ? requirements.programmingTypes
+    : []
+
+  const formatPrice = (price) => {
+    const value = Number(price)
+    return Number.isFinite(value) ? value.toLocaleString('en-IN') : "Not available"
+  }
 
   // RAM recommendation
   const getRecommendedRAM = (requirements) => {
@@ -125,7 +135,7 @@ const EvaluationReport = ({ requirements, laptopDetails, onStartNew }) => {
 
   // Processor evaluation
   const checkProcessor = (processor) => {
-    const name = (processor || "").toLowerCase()
+    const name = String(processor || "").toLowerCase()
 
     if (name.includes("i3") || name.includes("ryzen 3")) {
       return "Entry-level Processor"
@@ -146,7 +156,7 @@ const EvaluationReport = ({ requirements, laptopDetails, onStartNew }) => {
   }
 
   const getIntelGeneration = (processor) => {
-    const match = (processor || "").toLowerCase().match(/i[3579]-(\d{4,5})/)
+    const match = String(processor || "").toLowerCase().match(/i[3579]-(\d{4,5})/)
     if (!match) return null
 
     const modelNumber = match[1]
@@ -156,7 +166,7 @@ const EvaluationReport = ({ requirements, laptopDetails, onStartNew }) => {
   }
 
   const getAMDSeries = (processor) => {
-    const match = (processor || "").toLowerCase().match(/ryzen\s+[3579]\s+(\d{4})/)
+    const match = String(processor || "").toLowerCase().match(/ryzen\s+[3579]\s+(\d{4})/)
     if (!match) return null
 
     return Number(match[1][0]) * 1000
@@ -181,7 +191,7 @@ const EvaluationReport = ({ requirements, laptopDetails, onStartNew }) => {
 
   // Graphics evaluation
   const normalizeGraphics = (graphics) =>
-    (graphics || "").toLowerCase().replace(/[\s-]/g, "")
+    String(graphics || "").toLowerCase().replace(/[\s-]/g, "")
 
   const isIntegratedGraphics = (graphics) => {
     const name = normalizeGraphics(graphics)
@@ -235,18 +245,24 @@ const EvaluationReport = ({ requirements, laptopDetails, onStartNew }) => {
     return "Integrated graphics may be sufficient for your selected workload."
   }
 
-  // Calculations
+  // Calculations and input validation
   const recommendedRAM = getRecommendedRAM(requirements)
   const recommendedStorage = getRecommendedStorage(requirements)
 
-  const ram = Number(laptopDetails.ram || 0)
-  const storage = Number(laptopDetails.storage || 0)
-  const price = Number(laptopDetails.price || 0)
-  const budget = Number(requirements.budget || 0)
+  const getValidNumber = (value) => {
+    if (value === "" || value === null || value === undefined) return null
+    const number = Number(value)
+    return Number.isFinite(number) && number > 0 ? number : null
+  }
 
-  const meetsRAM = ram >= recommendedRAM
-  const meetsStorage = storage >= recommendedStorage
-  const meetsBudget = price <= budget
+  const ram = getValidNumber(laptopDetails.ram)
+  const storage = getValidNumber(laptopDetails.storage)
+  const price = getValidNumber(laptopDetails.price)
+  const budget = getValidNumber(requirements.budget)
+
+  const meetsRAM = ram !== null ? ram >= recommendedRAM : null
+  const meetsStorage = storage !== null ? storage >= recommendedStorage : null
+  const meetsBudget = price !== null && budget !== null ? price <= budget : null
 
   const graphicsCategory = getGraphicsCategory(laptopDetails.graphics)
 
@@ -267,27 +283,29 @@ const EvaluationReport = ({ requirements, laptopDetails, onStartNew }) => {
       )
     )
 
-  const meetsGraphics = !needsDedicatedGraphics
-    ? graphicsCategory !== "Unknown Graphics"
-    : needsHigherPerformance
-      ? graphicsCategory === "Higher-performance Dedicated"
-      : (
-          graphicsCategory === "Entry-level Dedicated" ||
-          graphicsCategory === "Higher-performance Dedicated"
-        )
+  const meetsGraphics = graphicsCategory === "Unknown Graphics"
+    ? null
+    : !needsDedicatedGraphics
+      ? true
+      : needsHigherPerformance
+        ? graphicsCategory === "Higher-performance Dedicated"
+        : (
+            graphicsCategory === "Entry-level Dedicated" ||
+            graphicsCategory === "Higher-performance Dedicated"
+          )
 
-  const failedRequirements = [
-    meetsRAM,
-    meetsStorage,
-    meetsBudget,
-    meetsGraphics
-  ].filter(status => !status).length
+  const evaluationResults = [meetsRAM, meetsStorage, meetsBudget, meetsGraphics]
+  const failedRequirements = evaluationResults.filter(status => status === false).length
+  const unknownRequirements = evaluationResults.filter(status => status === null).length
+  const passedRequirements = evaluationResults.filter(status => status === true).length
 
-  const overallVerdict = failedRequirements === 0
-    ? "Suitable"
-    : failedRequirements === 1
-      ? "Partially Suitable"
-      : "Not Suitable"
+  const overallVerdict = unknownRequirements > 0
+    ? "Needs Verification"
+    : failedRequirements === 0
+      ? "Suitable"
+      : failedRequirements === 1
+        ? "Partially Suitable"
+        : "Not Suitable"
 
   const processorType = checkProcessor(laptopDetails.processor)
   const intelGeneration = getIntelGeneration(laptopDetails.processor)
@@ -303,25 +321,33 @@ const EvaluationReport = ({ requirements, laptopDetails, onStartNew }) => {
           ? "We couldn't identify this graphics model. Verify its exact model and performance before purchasing."
           : "The graphics category identified by this prototype does not meet the estimated requirement for your workload."
 
-  const ramProgress = Math.min((ram / recommendedRAM) * 100, 100)
-  const storageProgress = Math.min((storage / recommendedStorage) * 100, 100)
-  const budgetProgress = budget > 0 ? Math.min((budget / Math.max(price, 1)) * 100, 100) : 0
+  const ramProgress = ram !== null ? Math.min((ram / recommendedRAM) * 100, 100) : 0
+  const storageProgress = storage !== null ? Math.min((storage / recommendedStorage) * 100, 100) : 0
+  const budgetProgress = budget !== null && price !== null
+    ? Math.min((budget / Math.max(price, 1)) * 100, 100)
+    : 0
 
   const recommendations = []
 
-  if (!meetsRAM) {
+  if (meetsRAM === false) {
     recommendations.push(`Consider at least ${recommendedRAM} GB RAM. Your laptop currently has ${ram} GB.`)
+  } else if (meetsRAM === null) {
+    recommendations.push("RAM information is missing or invalid. Enter a valid RAM amount to evaluate this requirement.")
   }
 
-  if (!meetsStorage) {
+  if (meetsStorage === false) {
     recommendations.push(`Consider at least ${recommendedStorage} GB storage. Your laptop currently has ${storage} GB.`)
+  } else if (meetsStorage === null) {
+    recommendations.push("Storage information is missing or invalid. Enter a valid storage amount to evaluate this requirement.")
   }
 
-  if (!meetsBudget) {
+  if (meetsBudget === false) {
     recommendations.push(`Look for a laptop within your budget of ₹${formatPrice(budget)}.`)
+  } else if (meetsBudget === null) {
+    recommendations.push("Laptop price or your budget is missing or invalid. Verify both values to evaluate the budget requirement.")
   }
 
-  if (!meetsGraphics) {
+  if (meetsGraphics === false || meetsGraphics === null) {
     recommendations.push(graphicsExplanation)
   }
 
@@ -340,14 +366,14 @@ const EvaluationReport = ({ requirements, laptopDetails, onStartNew }) => {
       <section className="report-laptop-banner">
         <div className="report-laptop-main">
           <span className="report-overline">EVALUATED LAPTOP</span>
-          <h2>{laptopDetails.brand} {laptopDetails.model}</h2>
-          <p>{laptopDetails.processor}</p>
+          <h2>{[laptopDetails.brand, laptopDetails.model].filter(Boolean).join(" ") || "Laptop details unavailable"}</h2>
+          <p>{laptopDetails.processor || "Processor not provided"}</p>
         </div>
         <div className="report-price">
           <span className="report-overline">LAPTOP PRICE</span>
-          <strong>₹{formatPrice(price)}</strong>
-          <span className={meetsBudget ? "price-within" : "price-over"}>
-            {meetsBudget ? "Within your budget" : "Above your budget"}
+          <strong>{price !== null ? `₹${formatPrice(price)}` : "Price unavailable"}</strong>
+          <span className={meetsBudget === null ? "price-over" : meetsBudget ? "price-within" : "price-over"}>
+            {meetsBudget === null ? "Budget not verified" : meetsBudget ? "Within your budget" : "Above your budget"}
           </span>
         </div>
       </section>
@@ -362,55 +388,55 @@ const EvaluationReport = ({ requirements, laptopDetails, onStartNew }) => {
         </div>
 
         <div className="report-spec-grid">
-          <article className={`report-spec-card ${meetsRAM ? "is-pass" : "is-fail"}`}>
+          <article className={`report-spec-card ${meetsRAM === null ? "is-unknown" : meetsRAM ? "is-pass" : "is-fail"}`}>
             <div className="report-spec-top">
               <span className="report-spec-icon">RAM</span>
-              <span className="report-pill">{meetsRAM ? "Meets target" : "Below target"}</span>
+              <span className="report-pill">{meetsRAM === null ? "Not verified" : meetsRAM ? "Meets target" : "Below target"}</span>
             </div>
             <h3>Memory</h3>
-            <strong className="report-spec-value">{ram}<small> GB</small></strong>
+            <strong className="report-spec-value">{ram ?? "Not provided"}<small>{ram !== null ? " GB" : ""}</small></strong>
             <p>Recommended: {recommendedRAM} GB</p>
             <div className="report-meter">
               <span style={{ width: `${ramProgress}%` }} />
             </div>
           </article>
 
-          <article className={`report-spec-card ${meetsStorage ? "is-pass" : "is-fail"}`}>
+          <article className={`report-spec-card ${meetsStorage === null ? "is-unknown" : meetsStorage ? "is-pass" : "is-fail"}`}>
             <div className="report-spec-top">
               <span className="report-spec-icon">SSD</span>
-              <span className="report-pill">{meetsStorage ? "Meets target" : "Below target"}</span>
+              <span className="report-pill">{meetsStorage === null ? "Not verified" : meetsStorage ? "Meets target" : "Below target"}</span>
             </div>
             <h3>Storage</h3>
-            <strong className="report-spec-value">{storage}<small> GB</small></strong>
+            <strong className="report-spec-value">{storage ?? "Not provided"}<small>{storage !== null ? " GB" : ""}</small></strong>
             <p>Recommended: {recommendedStorage} GB</p>
             <div className="report-meter">
               <span style={{ width: `${storageProgress}%` }} />
             </div>
           </article>
 
-          <article className={`report-spec-card ${meetsBudget ? "is-pass" : "is-fail"}`}>
+          <article className={`report-spec-card ${meetsBudget === null ? "is-unknown" : meetsBudget ? "is-pass" : "is-fail"}`}>
             <div className="report-spec-top">
               <span className="report-spec-icon">₹</span>
-              <span className="report-pill">{meetsBudget ? "Within budget" : "Over budget"}</span>
+              <span className="report-pill">{meetsBudget === null ? "Not verified" : meetsBudget ? "Within budget" : "Over budget"}</span>
             </div>
             <h3>Budget</h3>
             <strong className="report-spec-value report-price-value">
-              ₹{formatPrice(price)}
+              {price !== null ? `₹${formatPrice(price)}` : "Not provided"}
             </strong>
-            <p>Your budget: ₹{formatPrice(budget)}</p>
+            <p>Your budget: {budget !== null ? `₹${formatPrice(budget)}` : "Not provided"}</p>
             <div className="report-meter">
               <span style={{ width: `${budgetProgress}%` }} />
             </div>
           </article>
 
-          <article className={`report-spec-card ${meetsGraphics ? "is-pass" : "is-fail"}`}>
+          <article className={`report-spec-card ${meetsGraphics === null ? "is-unknown" : meetsGraphics ? "is-pass" : "is-fail"}`}>
             <div className="report-spec-top">
               <span className="report-spec-icon">GPU</span>
-              <span className="report-pill">{meetsGraphics ? "Meets target" : "Needs attention"}</span>
+              <span className="report-pill">{meetsGraphics === null ? "Not verified" : meetsGraphics ? "Meets target" : "Needs attention"}</span>
             </div>
             <h3>Graphics</h3>
             <strong className="report-spec-value report-graphics-value">
-              {laptopDetails.graphics}
+              {laptopDetails.graphics || "Not provided"}
             </strong>
             <p>{graphicsCategory}</p>
           </article>
@@ -429,7 +455,7 @@ const EvaluationReport = ({ requirements, laptopDetails, onStartNew }) => {
           <div className="report-processor-symbol">CPU</div>
           <div className="report-processor-content">
             <span className="report-overline">YOUR PROCESSOR</span>
-            <h3>{laptopDetails.processor}</h3>
+            <h3>{laptopDetails.processor || "Processor not provided"}</h3>
             <p>{processorType}</p>
             <div className="report-processor-tags">
               <span>{processorEvaluation}</span>
@@ -454,18 +480,20 @@ const EvaluationReport = ({ requirements, laptopDetails, onStartNew }) => {
             <span className="report-overline">YOUR SMARTBUY RESULT</span>
             <h2>{overallVerdict}</h2>
             <p>
-              {failedRequirements === 0
-                ? "This laptop meets all four evaluated requirements."
-                : `${failedRequirements} out of 4 requirements need attention.`}
+              {unknownRequirements > 0
+                ? `${unknownRequirements} requirement(s) could not be verified. ${failedRequirements} confirmed issue(s) need attention.`
+                : failedRequirements === 0
+                  ? "This laptop meets all four evaluated requirements."
+                  : `${failedRequirements} out of 4 requirements need attention.`}
             </p>
           </div>
           <div className="report-verdict-score">
-            <strong>{4 - failedRequirements}<small>/4</small></strong>
-            <span>Requirements met</span>
+            <strong>{passedRequirements}<small>/4</small></strong>
+            <span>Requirements verified as met</span>
           </div>
         </div>
         <div className="report-verdict-track">
-          <span style={{ width: `${((4 - failedRequirements) / 4) * 100}%` }} />
+          <span style={{ width: `${(passedRequirements / 4) * 100}%` }} />
         </div>
       </section>
 
@@ -479,21 +507,21 @@ const EvaluationReport = ({ requirements, laptopDetails, onStartNew }) => {
 
         <div className="report-breakdown">
           {[
-            { label: "RAM", passed: meetsRAM, detail: `${ram} GB installed · ${recommendedRAM} GB recommended` },
-            { label: "Storage", passed: meetsStorage, detail: `${storage} GB installed · ${recommendedStorage} GB recommended` },
-            { label: "Budget", passed: meetsBudget, detail: `₹${formatPrice(price)} price · ₹${formatPrice(budget)} budget` },
+            { label: "RAM", passed: meetsRAM, detail: `${ram ?? "Not provided"}${ram !== null ? " GB" : ""} installed · ${recommendedRAM} GB recommended` },
+            { label: "Storage", passed: meetsStorage, detail: `${storage ?? "Not provided"}${storage !== null ? " GB" : ""} installed · ${recommendedStorage} GB recommended` },
+            { label: "Budget", passed: meetsBudget, detail: `${price !== null ? `₹${formatPrice(price)}` : "Price unavailable"} price · ${budget !== null ? `₹${formatPrice(budget)}` : "Budget unavailable"} budget` },
             { label: "Graphics", passed: meetsGraphics, detail: graphicsCategory }
           ].map((item) => (
             <div className="report-breakdown-row" key={item.label}>
-              <div className={`report-check ${item.passed ? "check-pass" : "check-fail"}`}>
-                {item.passed ? "✓" : "!"}
+              <div className={`report-check ${item.passed === null ? "check-unknown" : item.passed ? "check-pass" : "check-fail"}`}>
+                {item.passed === null ? "?" : item.passed ? "✓" : "!"}
               </div>
               <div className="report-breakdown-info">
                 <strong>{item.label}</strong>
                 <span>{item.detail}</span>
               </div>
-              <span className={`report-breakdown-status ${item.passed ? "status-pass" : "status-fail"}`}>
-                {item.passed ? "Passed" : "Needs attention"}
+              <span className={`report-breakdown-status ${item.passed === null ? "status-unknown" : item.passed ? "status-pass" : "status-fail"}`}>
+                {item.passed === null ? "Not verified" : item.passed ? "Passed" : "Needs attention"}
               </span>
             </div>
           ))}
@@ -510,49 +538,59 @@ const EvaluationReport = ({ requirements, laptopDetails, onStartNew }) => {
 
         <div className="report-explanations">
           <article>
-            <span className="explanation-marker">{meetsRAM ? "✓" : "!"}</span>
+            <span className="explanation-marker">{meetsRAM === null ? "?" : meetsRAM ? "✓" : "!"}</span>
             <div>
               <h3>Memory</h3>
               <p>
-                {meetsRAM
-                  ? `${ram} GB RAM meets the estimated ${recommendedRAM} GB requirement for your selected usage.`
-                  : `Your laptop has ${ram} GB RAM, while this evaluation recommends ${recommendedRAM} GB. More memory can help with multitasking and demanding applications.`}
+                {meetsRAM === null
+                  ? "RAM information is missing or invalid, so this requirement could not be evaluated."
+                  : meetsRAM
+                    ? `${ram} GB RAM meets the estimated ${recommendedRAM} GB requirement for your selected usage.`
+                    : `Your laptop has ${ram} GB RAM, while this evaluation recommends ${recommendedRAM} GB. More memory can help with multitasking and demanding applications.`}
               </p>
             </div>
           </article>
 
           <article>
-            <span className="explanation-marker">{meetsStorage ? "✓" : "!"}</span>
+            <span className="explanation-marker">{meetsStorage === null ? "?" : meetsStorage ? "✓" : "!"}</span>
             <div>
               <h3>Storage</h3>
               <p>
-                {meetsStorage
-                  ? `${storage} GB storage meets the estimated ${recommendedStorage} GB requirement.`
-                  : `Your laptop has ${storage} GB storage, while this evaluation recommends ${recommendedStorage} GB. Additional storage may be useful for applications, games, projects, and media files.`}
+                {meetsStorage === null
+                  ? "Storage information is missing or invalid, so this requirement could not be evaluated."
+                  : meetsStorage
+                    ? `${storage} GB storage meets the estimated ${recommendedStorage} GB requirement.`
+                    : `Your laptop has ${storage} GB storage, while this evaluation recommends ${recommendedStorage} GB. Additional storage may be useful for applications, games, projects, and media files.`}
               </p>
             </div>
           </article>
 
           <article>
-            <span className="explanation-marker">{meetsBudget ? "✓" : "!"}</span>
+            <span className="explanation-marker">{meetsBudget === null ? "?" : meetsBudget ? "✓" : "!"}</span>
             <div>
               <h3>Budget</h3>
               <p>
-                {meetsBudget
-                  ? `The laptop price of ₹${formatPrice(price)} is within your ₹${formatPrice(budget)} budget.`
-                  : `The laptop costs ₹${formatPrice(price)}, which is ₹${formatPrice(price - budget)} above your budget.`}
+                {meetsBudget === null
+                  ? "The laptop price or your budget is missing or invalid, so this requirement could not be evaluated."
+                  : meetsBudget
+                    ? `The laptop price of ₹${formatPrice(price)} is within your ₹${formatPrice(budget)} budget.`
+                    : `The laptop costs ₹${formatPrice(price)}, which is ₹${formatPrice(price - budget)} above your budget.`}
               </p>
             </div>
           </article>
 
           <article>
-            <span className="explanation-marker">{meetsGraphics ? "✓" : "!"}</span>
+            <span className="explanation-marker">{meetsGraphics === null ? "?" : meetsGraphics ? "✓" : "!"}</span>
             <div>
               <h3>Graphics</h3>
               <p>
-                {meetsGraphics
-                  ? "The identified graphics category meets this prototype's estimated requirement for your selected usage."
-                  : graphicsExplanation}
+                {meetsGraphics === null
+                  ? graphicsCategory === "Unknown Graphics"
+                    ? graphicsExplanation
+                    : "Graphics information could not be evaluated."
+                  : meetsGraphics
+                    ? "The identified graphics category meets this prototype's estimated requirement for your selected usage."
+                    : graphicsExplanation}
               </p>
             </div>
           </article>
@@ -572,7 +610,9 @@ const EvaluationReport = ({ requirements, laptopDetails, onStartNew }) => {
               ))}
             </ul>
           ) : (
-            <p>Your laptop meets all the evaluated requirements. No major changes are suggested by this assessment.</p>
+            <p>{unknownRequirements > 0
+              ? "Some details need verification before SmartBuy can provide a complete assessment."
+              : "Your laptop meets all the evaluated requirements. No major changes are suggested by this assessment."}</p>
           )}
 
           <p className="report-graphics-note">

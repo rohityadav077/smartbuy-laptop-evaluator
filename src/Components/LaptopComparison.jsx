@@ -3,31 +3,43 @@ import React from 'react'
 import './LaptopComparison.css'
 
 const LaptopComparison = ({
-  laptopOne,
-  laptopTwo,
-  requirements,
+  laptopOne = {},
+  laptopTwo = {},
+  requirements = {},
   onStartNew
 }) => {
-  const selectedPurposes = requirements.selectedPurposes || []
-  const programmingTypes = requirements.programmingTypes || []
+  requirements = requirements || {}
+  laptopOne = laptopOne || {}
+  laptopTwo = laptopTwo || {}
 
-  // Recommended RAM
-  const getRecommendedRAM = (requirements) => {
-    const intensity = requirements.usageIntensity
+  const selectedPurposes = Array.isArray(requirements.selectedPurposes)
+    ? requirements.selectedPurposes
+    : []
+  const programmingTypes = Array.isArray(requirements.programmingTypes)
+    ? requirements.programmingTypes
+    : []
+  const intensity = requirements.usageIntensity || "Basic"
+
+  // ==========================================
+  // 1. RECOMMENDED RAM
+  // ==========================================
+
+  const getRecommendedRAM = () => {
     let recommendedRAM = 8
 
     if (selectedPurposes.includes("Programming")) {
       if (programmingTypes.includes("AI / Machine Learning")) {
         recommendedRAM = Math.max(
           recommendedRAM,
-          intensity === "Basic" ? 16 : intensity === "Moderate" ? 16 : 32
+          intensity === "Heavy" ? 32 : 16
         )
       }
 
       if (programmingTypes.includes("App Development")) {
         recommendedRAM = Math.max(
           recommendedRAM,
-          intensity === "Heavy" ? 32 : intensity === "Moderate" ? 16 : 8
+          intensity === "Heavy" ? 32 :
+          intensity === "Moderate" ? 16 : 8
         )
       }
 
@@ -41,7 +53,8 @@ const LaptopComparison = ({
       if (programmingTypes.includes("General Programming")) {
         recommendedRAM = Math.max(
           recommendedRAM,
-          intensity === "Basic" ? 8 : intensity === "Moderate" ? 16 : 32
+          intensity === "Basic" ? 8 :
+          intensity === "Moderate" ? 16 : 32
         )
       }
     }
@@ -71,7 +84,8 @@ const LaptopComparison = ({
       selectedPurposes.includes("General Use")
     ) {
       const basicRAM =
-        intensity === "Basic" ? 8 : intensity === "Moderate" ? 8 : 16
+        intensity === "Basic" ? 8 :
+        intensity === "Moderate" ? 8 : 16
 
       recommendedRAM = Math.max(recommendedRAM, basicRAM)
     }
@@ -79,9 +93,11 @@ const LaptopComparison = ({
     return recommendedRAM
   }
 
-  // Recommended storage
-  const getRecommendedStorage = (requirements) => {
-    const intensity = requirements.usageIntensity
+  // ==========================================
+  // 2. RECOMMENDED STORAGE
+  // ==========================================
+
+  const getRecommendedStorage = () => {
     let recommendedStorage = 256
 
     if (selectedPurposes.includes("Programming")) {
@@ -112,7 +128,10 @@ const LaptopComparison = ({
       const gamingStorage =
         requirements.gamingType === "AAA Games" ? 1024 : 512
 
-      recommendedStorage = Math.max(recommendedStorage, gamingStorage)
+      recommendedStorage = Math.max(
+        recommendedStorage,
+        gamingStorage
+      )
     }
 
     if (selectedPurposes.includes("Video Editing")) {
@@ -123,7 +142,10 @@ const LaptopComparison = ({
             ? 1024
             : 512
 
-      recommendedStorage = Math.max(recommendedStorage, editingStorage)
+      recommendedStorage = Math.max(
+        recommendedStorage,
+        editingStorage
+      )
     }
 
     if (
@@ -140,31 +162,45 @@ const LaptopComparison = ({
     return recommendedStorage
   }
 
-  // Graphics evaluation
+  // ==========================================
+  // 3. GRAPHICS CLASSIFICATION
+  // ==========================================
+
   const normalizeGraphics = (graphics) =>
     (graphics || "").toLowerCase().replace(/[\s-]/g, "")
 
   const getGraphicsCategory = (graphics) => {
     const name = normalizeGraphics(graphics)
 
+    if (!name) {
+      return "Unknown Graphics"
+    }
+
+    // Integrated graphics
     if (
       name.includes("integrated") ||
       name.includes("inteluhd") ||
       name.includes("inteliris") ||
-      name.includes("intelhd")
+      name.includes("intelhd") ||
+      name.includes("radeongraphics") ||
+      name.includes("radeonvega")
     ) {
       return "Integrated"
     }
 
+    // Entry-level dedicated graphics
     if (
-      name.includes("gtx1650") ||
       name.includes("gtx1050") ||
+      name.includes("gtx1650") ||
+      name.includes("gtx1660") ||
       name.includes("rtx2050") ||
-      name.includes("gtx1660")
+      name.includes("rtx3050") ||
+      name.includes("rtx2060")
     ) {
       return "Entry-level Dedicated"
     }
 
+    // Higher-performance dedicated graphics
     if (
       name.includes("rtx3060") ||
       name.includes("rtx3070") ||
@@ -181,7 +217,11 @@ const LaptopComparison = ({
     return "Unknown Graphics"
   }
 
-  // Processor category (informational only)
+  // ==========================================
+  // 4. PROCESSOR CLASSIFICATION
+  // Informational only
+  // ==========================================
+
   const getProcessorCategory = (processor) => {
     const name = (processor || "").toLowerCase()
 
@@ -205,8 +245,12 @@ const LaptopComparison = ({
     return "Unknown"
   }
 
-  const recommendedRAM = getRecommendedRAM(requirements)
-  const recommendedStorage = getRecommendedStorage(requirements)
+  // ==========================================
+  // 5. USER REQUIREMENTS
+  // ==========================================
+
+  const recommendedRAM = getRecommendedRAM()
+  const recommendedStorage = getRecommendedStorage()
 
   const needsDedicatedGraphics =
     selectedPurposes.includes("Gaming") ||
@@ -225,34 +269,44 @@ const LaptopComparison = ({
       )
     )
 
-  // Evaluate each laptop
-  const evaluateLaptop = (laptop) => {
-    const meetsRAM = Number(laptop.ram) >= recommendedRAM
+  // ==========================================
+  // 6. EVALUATE EACH LAPTOP
+  // ==========================================
 
-    const meetsStorage =
-      Number(laptop.storage) >= recommendedStorage
+  const getValidNumber = (value) => {
+    if (value === "" || value === null || value === undefined) return null
+    const number = Number(value)
+    return Number.isFinite(number) && number > 0 ? number : null
+  }
 
-    const meetsBudget =
-      Number(laptop.price) <= Number(requirements.budget)
+  const evaluateLaptop = (laptop = {}) => {
+    const ram = getValidNumber(laptop.ram)
+    const storage = getValidNumber(laptop.storage)
+    const price = getValidNumber(laptop.price)
+    const budget = getValidNumber(requirements.budget)
+
+    const meetsRAM = ram === null ? null : ram >= recommendedRAM
+    const meetsStorage = storage === null ? null : storage >= recommendedStorage
+    const meetsBudget = price === null || budget === null ? null : price <= budget
 
     const graphicsCategory = getGraphicsCategory(laptop.graphics)
+    let meetsGraphics = null
 
-    const meetsGraphics =
-      !needsDedicatedGraphics
-        ? graphicsCategory !== "Unknown Graphics"
-        : needsHigherPerformance
-          ? graphicsCategory === "Higher-performance Dedicated"
-          : (
-            graphicsCategory === "Entry-level Dedicated" ||
-            graphicsCategory === "Higher-performance Dedicated"
-          )
+    if (graphicsCategory !== "Unknown Graphics") {
+      if (!needsDedicatedGraphics) {
+        meetsGraphics = true
+      } else if (needsHigherPerformance) {
+        meetsGraphics = graphicsCategory === "Higher-performance Dedicated"
+      } else {
+        meetsGraphics =
+          graphicsCategory === "Entry-level Dedicated" ||
+          graphicsCategory === "Higher-performance Dedicated"
+      }
+    }
 
-    const score = [
-      meetsRAM,
-      meetsStorage,
-      meetsBudget,
-      meetsGraphics
-    ].filter(Boolean).length
+    const statuses = [meetsRAM, meetsStorage, meetsBudget, meetsGraphics]
+    const score = statuses.filter(status => status === true).length
+    const unknownCount = statuses.filter(status => status === null).length
 
     return {
       meetsRAM,
@@ -260,73 +314,104 @@ const LaptopComparison = ({
       meetsBudget,
       meetsGraphics,
       graphicsCategory,
-      score
+      score,
+      unknownCount
     }
   }
+
   const resultOne = evaluateLaptop(laptopOne)
-const resultTwo = evaluateLaptop(laptopTwo)
+  const resultTwo = evaluateLaptop(laptopTwo)
 
- 
-  // Decide the comparison result
+  // ==========================================
+  // 7. DECIDE THE COMPARISON RESULT
+  // ==========================================
 
-  const priceOne = Number(laptopOne.price)
-  const priceTwo = Number(laptopTwo.price)
+  const priceOne = getValidNumber(laptopOne.price)
+  const priceTwo = getValidNumber(laptopTwo.price)
 
   let winner = ""
   let winnerReason = ""
 
+  const criticalGraphicsRequired = needsDedicatedGraphics
   const bothFailCriticalGraphics =
-    needsHigherPerformance &&
-    !resultOne.meetsGraphics &&
-    !resultTwo.meetsGraphics
+    criticalGraphicsRequired &&
+    resultOne.meetsGraphics === false &&
+    resultTwo.meetsGraphics === false
+
+  const hasUnknownCriticalGraphics =
+    criticalGraphicsRequired &&
+    (resultOne.meetsGraphics === null || resultTwo.meetsGraphics === null)
+
+  const hasUnknownRequirements =
+    resultOne.unknownCount > 0 || resultTwo.unknownCount > 0
 
   if (bothFailCriticalGraphics) {
     winner = "Neither laptop meets the critical graphics requirement"
-  } 
-  else if (
-    needsHigherPerformance &&
+  } else if (hasUnknownCriticalGraphics || hasUnknownRequirements) {
+    winner = "Comparison needs verification"
+  } else if (
+    criticalGraphicsRequired &&
     resultOne.meetsGraphics !== resultTwo.meetsGraphics
   ) {
     winner = resultOne.meetsGraphics ? "Laptop 1" : "Laptop 2"
     winnerReason = "graphics"
-  } 
-  else if (resultOne.score > resultTwo.score) {
+  } else if (resultOne.score > resultTwo.score) {
     winner = "Laptop 1"
     winnerReason = "requirements"
-  } 
-  else if (resultTwo.score > resultOne.score) {
+  } else if (resultTwo.score > resultOne.score) {
     winner = "Laptop 2"
     winnerReason = "requirements"
-  } 
-  else if (priceOne < priceTwo) {
+  } else if (priceOne !== null && priceTwo !== null && priceOne < priceTwo) {
     winner = "Laptop 1"
     winnerReason = "price"
-  } 
-  else if (priceTwo < priceOne) {
+  } else if (priceOne !== null && priceTwo !== null && priceTwo < priceOne) {
     winner = "Laptop 2"
     winnerReason = "price"
-  } 
-  else {
+  } else if (priceOne !== null && priceTwo !== null && priceOne === priceTwo) {
     winner = "Both laptops are equally suitable"
+  } else {
+    winner = "Comparison needs verification"
   }
 
+  // ==========================================
+  // 8. HELPER FUNCTIONS
+  // ==========================================
 
-  const formatPrice = (price) =>
-    Number(price).toLocaleString("en-IN")
+  const formatPrice = (price) => {
+    const value = getValidNumber(price)
+
+    return value !== null
+      ? value.toLocaleString("en-IN")
+      : "Not available"
+  }
+
+  const getStatusText = (status) => {
+    if (status === null) return "? Needs verification"
+    return status ? "✓ Meets requirement" : "✕ Does not meet requirement"
+  }
+
+  const getStatusClass = (status) => {
+    if (status === null) return "table-unknown"
+    return status ? "table-pass" : "table-fail"
+  }
+
+  // ==========================================
+  // 9. COMPARISON TABLE DATA
+  // ==========================================
 
   const comparisonRows = [
     {
       label: "RAM",
-      valueOne: `${laptopOne.ram} GB`,
-      valueTwo: `${laptopTwo.ram} GB`,
+      valueOne: `${getValidNumber(laptopOne.ram) ?? "N/A"} GB`,
+      valueTwo: `${getValidNumber(laptopTwo.ram) ?? "N/A"} GB`,
       requirement: `${recommendedRAM} GB minimum`,
       statusOne: resultOne.meetsRAM,
       statusTwo: resultTwo.meetsRAM
     },
     {
       label: "Storage",
-      valueOne: `${laptopOne.storage} GB`,
-      valueTwo: `${laptopTwo.storage} GB`,
+      valueOne: `${getValidNumber(laptopOne.storage) ?? "N/A"} GB`,
+      valueTwo: `${getValidNumber(laptopTwo.storage) ?? "N/A"} GB`,
       requirement: `${recommendedStorage} GB minimum`,
       statusOne: resultOne.meetsStorage,
       statusTwo: resultTwo.meetsStorage
@@ -341,8 +426,8 @@ const resultTwo = evaluateLaptop(laptopTwo)
     },
     {
       label: "Graphics",
-      valueOne: laptopOne.graphics,
-      valueTwo: laptopTwo.graphics,
+      valueOne: laptopOne.graphics || "Not specified",
+      valueTwo: laptopTwo.graphics || "Not specified",
       requirement: needsHigherPerformance
         ? "Higher-performance dedicated GPU"
         : needsDedicatedGraphics
@@ -353,33 +438,104 @@ const resultTwo = evaluateLaptop(laptopTwo)
     }
   ]
 
-  const getStatusText = (status) =>
-    status ? "✓ Meets requirement" : "✕ Does not meet requirement"
+  // ==========================================
+  // 10. FINAL RECOMMENDATION EXPLANATION
+  // ==========================================
+
+  const getRecommendationTitle = () => {
+    if (bothFailCriticalGraphics) return "Neither laptop meets your graphics needs"
+    if (winner === "Comparison needs verification") return "More information is needed"
+    if (winner === "Both laptops are equally suitable") return "It's a tie!"
+    if (winnerReason === "graphics") return `${winner} is recommended for your graphics needs`
+    if (winnerReason === "price") return `${winner} offers better value`
+    return `${winner} is the better match`
+  }
+
+  const getRecommendationMessage = () => {
+    if (bothFailCriticalGraphics) {
+      return "Neither laptop meets the required graphics category for your selected usage. Consider another laptop with suitable dedicated graphics."
+    }
+
+    if (winner === "Comparison needs verification") {
+      return `SmartBuy could not verify all four requirements. Laptop 1 has ${resultOne.unknownCount} item(s) needing verification and Laptop 2 has ${resultTwo.unknownCount}. Check the missing or unrecognized specifications and compare again before choosing a winner.`
+    }
+
+    if (winner === "Both laptops are equally suitable") {
+      return `Both laptops meet ${resultOne.score} of the four evaluated requirements and have the same price. Compare their processor performance, display, battery, build quality, warranty, and real-world benchmarks before deciding.`
+    }
+
+    if (winnerReason === "graphics") {
+      const otherLaptop = winner === "Laptop 1" ? "Laptop 2" : "Laptop 1"
+      const winnerResult = winner === "Laptop 1" ? resultOne : resultTwo
+      const otherResult = winner === "Laptop 1" ? resultTwo : resultOne
+
+      return `${winner} is recommended because it meets the graphics requirement for your selected workload. ${otherLaptop} does not meet this important requirement. ${winner} meets ${winnerResult.score} of 4 evaluated requirements, while ${otherLaptop} meets ${otherResult.score} of 4. This recommendation prioritizes graphics over the total count.`
+    }
+
+    if (winnerReason === "price") {
+      return `${winner} meets the same number of requirements and costs ₹${formatPrice(Math.abs(priceOne - priceTwo))} less. It offers the lower price based on the specifications entered. Also compare processor performance, display, battery, warranty, and build quality.`
+    }
+
+    const winningResult = winner === "Laptop 1" ? resultOne : resultTwo
+    const otherResult = winner === "Laptop 1" ? resultTwo : resultOne
+    const otherLaptop = winner === "Laptop 1" ? "Laptop 2" : "Laptop 1"
+
+    const advantages = []
+    if (winningResult.meetsRAM && !otherResult.meetsRAM) advantages.push("RAM")
+    if (winningResult.meetsStorage && !otherResult.meetsStorage) advantages.push("storage")
+    if (winningResult.meetsBudget && !otherResult.meetsBudget) advantages.push("budget")
+    if (winningResult.meetsGraphics && !otherResult.meetsGraphics) advantages.push("graphics")
+
+    const advantageText = advantages.length
+      ? ` Its advantages are: ${advantages.join(", ")}.`
+      : ""
+
+    return `${winner} meets ${winningResult.score} of the four evaluated requirements, compared with ${otherResult.score} for ${otherLaptop}.${advantageText} The recommendation is based on RAM, storage, budget, and graphics only; processor category is informational and does not affect the score.`
+  }
+
+  // ==========================================
+  // 11. UI
+  // ==========================================
 
   return (
     <div className="comparison-container">
 
       {/* Header */}
       <div className="comparison-header">
-        <span className="comparison-badge">SMARTBUY COMPARISON</span>
+        <span className="comparison-badge">
+          SMARTBUY COMPARISON
+        </span>
+
         <h1>Laptop Comparison</h1>
-        <p>Compare both laptops and find which one better matches your needs.</p>
+
+        <p>
+          Compare both laptops and find which one better matches your needs.
+        </p>
       </div>
 
       {/* Laptop Cards */}
       <div className="laptop-comparison-cards">
 
-        <div className={`laptop-choice-card ${winner === "Laptop 1" ? "winner-card" : ""}`}>
+        <div
+          className={`laptop-choice-card ${
+            winner === "Laptop 1" ? "winner-card" : ""
+          }`}
+        >
           {winner === "Laptop 1" && (
-            <span className="winner-label">RECOMMENDED CHOICE</span>
+            <span className="winner-label">
+              RECOMMENDED CHOICE
+            </span>
           )}
 
           <div className="choice-icon">💻</div>
+
           <span className="choice-label">LAPTOP 1</span>
 
-          <h2>{laptopOne.brand} {laptopOne.model}</h2>
+          <h2>
+            {laptopOne.brand || "Laptop"} {laptopOne.model || ""}
+          </h2>
 
-          <p>{laptopOne.processor}</p>
+          <p>{laptopOne.processor || "Processor not specified"}</p>
 
           <div className="choice-price">
             ₹{formatPrice(laptopOne.price)}
@@ -387,22 +543,32 @@ const resultTwo = evaluateLaptop(laptopTwo)
 
           <div className="choice-score">
             {resultOne.score}/4 requirements met
+            {resultOne.unknownCount > 0 && <small> · {resultOne.unknownCount} needs verification</small>}
           </div>
         </div>
 
         <div className="versus-divider">VS</div>
 
-        <div className={`laptop-choice-card ${winner === "Laptop 2" ? "winner-card" : ""}`}>
+        <div
+          className={`laptop-choice-card ${
+            winner === "Laptop 2" ? "winner-card" : ""
+          }`}
+        >
           {winner === "Laptop 2" && (
-            <span className="winner-label">RECOMMENDED CHOICE</span>
+            <span className="winner-label">
+              RECOMMENDED CHOICE
+            </span>
           )}
 
           <div className="choice-icon">💻</div>
+
           <span className="choice-label">LAPTOP 2</span>
 
-          <h2>{laptopTwo.brand} {laptopTwo.model}</h2>
+          <h2>
+            {laptopTwo.brand || "Laptop"} {laptopTwo.model || ""}
+          </h2>
 
-          <p>{laptopTwo.processor}</p>
+          <p>{laptopTwo.processor || "Processor not specified"}</p>
 
           <div className="choice-price">
             ₹{formatPrice(laptopTwo.price)}
@@ -410,6 +576,7 @@ const resultTwo = evaluateLaptop(laptopTwo)
 
           <div className="choice-score">
             {resultTwo.score}/4 requirements met
+            {resultTwo.unknownCount > 0 && <small> · {resultTwo.unknownCount} needs verification</small>}
           </div>
         </div>
 
@@ -417,13 +584,19 @@ const resultTwo = evaluateLaptop(laptopTwo)
 
       {/* Comparison Table */}
       <section className="comparison-section">
+
         <div className="comparison-section-heading">
           <h2>Specification Comparison</h2>
-          <p>Both laptops evaluated against your requirements.</p>
+
+          <p>
+            Both laptops evaluated against your requirements.
+          </p>
         </div>
 
         <div className="comparison-table-wrapper">
+
           <table className="comparison-table">
+
             <thead>
               <tr>
                 <th>Specification</th>
@@ -434,101 +607,133 @@ const resultTwo = evaluateLaptop(laptopTwo)
             </thead>
 
             <tbody>
+
               {comparisonRows.map((row) => (
                 <tr key={row.label}>
-                  <td className="comparison-row-label">{row.label}</td>
+
+                  <td className="comparison-row-label">
+                    {row.label}
+                  </td>
 
                   <td>
                     <strong>{row.valueOne}</strong>
-                    <span className={`table-status ${row.statusOne ? "table-pass" : "table-fail"}`}>
+
+                    <span
+                      className={`table-status ${
+                        getStatusClass(row.statusOne)
+                      }`}
+                    >
                       {getStatusText(row.statusOne)}
                     </span>
                   </td>
 
                   <td>
                     <strong>{row.valueTwo}</strong>
-                    <span className={`table-status ${row.statusTwo ? "table-pass" : "table-fail"}`}>
+
+                    <span
+                      className={`table-status ${
+                        getStatusClass(row.statusTwo)
+                      }`}
+                    >
                       {getStatusText(row.statusTwo)}
                     </span>
                   </td>
 
-                  <td className="requirement-column">{row.requirement}</td>
+                  <td className="requirement-column">
+                    {row.requirement}
+                  </td>
+
                 </tr>
               ))}
 
+              {/* Processor */}
               <tr>
-                <td className="comparison-row-label">Processor</td>
+
+                <td className="comparison-row-label">
+                  Processor
+                </td>
+
                 <td>
-                  <strong>{laptopOne.processor}</strong>
+                  <strong>
+                    {laptopOne.processor || "Not specified"}
+                  </strong>
+
                   <span className="processor-category">
                     {getProcessorCategory(laptopOne.processor)}
                   </span>
                 </td>
+
                 <td>
-                  <strong>{laptopTwo.processor}</strong>
+                  <strong>
+                    {laptopTwo.processor || "Not specified"}
+                  </strong>
+
                   <span className="processor-category">
                     {getProcessorCategory(laptopTwo.processor)}
                   </span>
                 </td>
-                <td className="requirement-column">Informational only</td>
+
+                <td className="requirement-column">
+                  Informational only
+                </td>
+
               </tr>
+
             </tbody>
+
           </table>
+
         </div>
+
       </section>
 
-      {/* Final Result */}
-   
-  {/* Final Result */}
+      {/* Final Recommendation */}
+      <section className="comparison-result">
 
-  <section className="comparison-result">
-    <span className="result-eyebrow">
-      SMARTBUY RECOMMENDATION
-    </span>
+        <span className="result-eyebrow">
+          SMARTBUY RECOMMENDATION
+        </span>
 
-    <h2>
-      {winner === "Neither laptop meets the critical graphics requirement"
-        ? "Neither laptop meets your critical graphics needs"
-        : winner === "Both laptops are equally suitable"
-          ? "It's a tie!"
-          : winnerReason === "price"
-            ? `${winner} offers better value`
-            : `${winner} is the better match`}
-    </h2>
+        <h2>
+          {getRecommendationTitle()}
+        </h2>
 
-    <p>
-      {winner === "Neither laptop meets the critical graphics requirement"
-        ? "Both laptops fail the estimated higher-performance graphics requirement. Consider another laptop with a suitable GPU."
-        : winner === "Both laptops are equally suitable"
-          ? "Both laptops meet the same requirements and have the same price. Compare their other features, warranty, and real-world performance before deciding."
-          : winnerReason === "price"
-            ? `Both laptops meet ${resultOne.score} out of 4 evaluated requirements, but ${winner} is cheaper by ₹${formatPrice(Math.abs(priceOne - priceTwo))}.`
-            : `${winner} meets ${winner === "Laptop 1" ? resultOne.score : resultTwo.score} out of 4 evaluated requirements.`}
-    </p>
+        <p>
+          {getRecommendationMessage()}
+        </p>
 
-    <div className="result-scores">
-      <div>
-        <span>Laptop 1</span>
-        <strong>{resultOne.score}/4</strong>
-      </div>
+        <div className="result-scores">
 
-      <div>
-        <span>Laptop 2</span>
-        <strong>{resultTwo.score}/4</strong>
-      </div>
-    </div>
-  </section>
+          <div>
+            <span>Laptop 1</span>
+            <strong>{resultOne.score}/4{resultOne.unknownCount > 0 ? " + ?" : ""}</strong>
+          </div>
 
+          <div>
+            <span>Laptop 2</span>
+            <strong>{resultTwo.score}/4{resultTwo.unknownCount > 0 ? " + ?" : ""}</strong>
+          </div>
+
+        </div>
+
+      </section>
 
       {/* Action */}
       <div className="comparison-actions">
+
         <button onClick={onStartNew}>
           Start New Evaluation <span>→</span>
         </button>
+
       </div>
 
+      {/* Disclaimer */}
       <p className="comparison-disclaimer">
-        Note: This comparison uses estimated hardware requirements and simplified graphics and processor model checks. Verify exact specifications and real-world benchmarks before purchasing.
+        Note: This comparison uses estimated hardware requirements
+        and simplified graphics and processor model checks. GPU
+        classifications do not guarantee actual performance.
+        Verify exact specifications, GPU power limits, benchmarks,
+        warranty, and real-world performance before purchasing.
       </p>
 
     </div>
